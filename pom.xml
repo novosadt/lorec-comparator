@@ -7,7 +7,7 @@
     <groupId>cz.vsb.genetics</groupId>
     <artifactId>om-hts-svc</artifactId>
     <description>Optical Mapping and High-Through-Put (HTS) Structural Variant Comparator</description>
-    <version>2.0</version>
+    <version>1.0</version>
 
     <dependencies>
         <dependency>
