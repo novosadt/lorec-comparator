@@ -43,7 +43,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
     private static final String ARG_SAMPLOT_INPUT = "samplot_input";
     private static final String ARG_VARIANT_TYPE = "variant_type";
-    private static final String ARG_VARIANCE_DISTANCE = "variance_distance";
+    private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
     private static final String ARG_GENE_INTERSECTION = "gene_intersection";
     private static final String ARG_PREFER_BASE_SVTYPE = "prefer_base_svtype";
@@ -53,7 +53,7 @@ public class BionanoHtsSvComparator {
         CommandLine cmd = getCommandLine(args);
 
         try {
-            Long variantDistance = cmd.hasOption(ARG_VARIANCE_DISTANCE) ? new Long(cmd.getOptionValue(ARG_VARIANCE_DISTANCE)) : null;
+            Long variantDistance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
             Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
             Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
             boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
@@ -78,7 +78,7 @@ public class BionanoHtsSvComparator {
                     cmd.getOptionValue(ARG_OUTPUT));
 
             svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
-            svComparator.setVariantDistance(variantDistance);
+            svComparator.setDistanceVariance(variantDistance);
             svComparator.setVariantType(variantType);
             svComparator.setMinimalProportion(minimalProportion);
 
@@ -129,11 +129,11 @@ public class BionanoHtsSvComparator {
         variantType.setRequired(false);
         options.addOption(variantType);
 
-        Option variantDistance = new Option("d", ARG_VARIANCE_DISTANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
-        variantDistance.setType(Long.class);
-        variantDistance.setArgName("number");
-        variantDistance.setRequired(false);
-        options.addOption(variantDistance);
+        Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
+        distanceVariance.setType(Long.class);
+        distanceVariance.setArgName("number");
+        distanceVariance.setRequired(false);
+        options.addOption(distanceVariance);
 
         Option minimalProportion = new Option("mp", ARG_MINIMAL_PROPORTION, true, "minimal proportion filter - minimal proportion of target variant within query variant (0.0 - 1.0)");
         minimalProportion.setType(Double.class);
