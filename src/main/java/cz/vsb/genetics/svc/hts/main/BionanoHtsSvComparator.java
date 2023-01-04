@@ -154,7 +154,7 @@ public class BionanoHtsSvComparator {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            System.out.println("\nSVC - Bionano Genomics (OM) and SAMPlot Structural Variant Comparator, v" + BionanoHtsSvComparator.version() + "\n");
+            System.out.println("\nSVC - Bionano Genomics (OM) and High Throughput Sequencing (HTS) Structural Variant Comparator, v" + BionanoHtsSvComparator.version() + "\n");
             System.out.println(e.getMessage());
             System.out.println();
             formatter.printHelp(
@@ -162,7 +162,7 @@ public class BionanoHtsSvComparator {
                     "\njava -jar om-samplot-svc.jar ",
                     "\noptions:",
                     options,
-                    "\nTomas Novosad, VSB-TU Ostrava, 2022" +
+                    "\nTomas Novosad, VSB-TU Ostrava, 2023" +
                             "\nFEI, Department of Computer Science" +
                             "\nVersion: " + version() +
                             "\nLicense: GPL-3.0-only ");
