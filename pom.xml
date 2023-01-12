@@ -6,8 +6,8 @@
 
     <groupId>cz.vsb.genetics</groupId>
     <artifactId>om-hts-svc</artifactId>
-    <description>Optical Mapping and High-Through-Put (HTS) Structural Variant Comparator</description>
-    <version>1.0</version>
+    <description>Optical Mapping (OM) and High-Throughput Sequencing (HTS) Structural Variant Comparator</description>
+    <version>1.1</version>
 
     <dependencies>
         <dependency>
