@@ -26,6 +26,7 @@
 package cz.vsb.genetics.svc.hts.main;
 
 import cz.vsb.genetics.ngs.sv.AnnotSvTsvParser;
+import cz.vsb.genetics.ngs.sv.LongRangerVcfParser;
 import cz.vsb.genetics.ngs.sv.SamplotCsvParser;
 import cz.vsb.genetics.om.sv.BionanoPipelineResultParser;
 import cz.vsb.genetics.sv.MultipleSvComparator;
@@ -33,15 +34,13 @@ import cz.vsb.genetics.sv.StructuralVariantType;
 import cz.vsb.genetics.sv.SvResultParser;
 import org.apache.commons.cli.*;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
 public class BionanoHtsSvComparator {
     private static final String ARG_BIONANO_INPUT = "bionano_input";
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
     private static final String ARG_SAMPLOT_INPUT = "samplot_input";
+    private static final String ARG_VCF_LONGRANGER_INPUT = "vcf_longranger_input";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
@@ -59,37 +58,67 @@ public class BionanoHtsSvComparator {
             boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
             boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
 
+            List<SvResultParser> otherParsers = new ArrayList<>();
+            List<String> otherLabels = new ArrayList<>();
+
+            SvResultParser annotsvParser = null;
+            if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
+                annotsvParser = new AnnotSvTsvParser(preferBaseSvType);
+                annotsvParser.setRemoveDuplicateVariants(true);
+                annotsvParser.parseResultFile(cmd.getOptionValue(ARG_ANNOTSV_INPUT), "\t");
+                otherParsers.add(annotsvParser);
+                otherLabels.add("annotsv");
+            }
+
+            SvResultParser samplotParser = null;
+            if (cmd.hasOption(ARG_SAMPLOT_INPUT)) {
+                samplotParser = new SamplotCsvParser();
+                samplotParser.setRemoveDuplicateVariants(true);
+                samplotParser.parseResultFile(cmd.getOptionValue(ARG_SAMPLOT_INPUT), "\t");
+                otherParsers.add(samplotParser);
+                otherLabels.add("samplot");
+            }
+
+            SvResultParser vcfLongrangerParser = null;
+            if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
+                vcfLongrangerParser = new LongRangerVcfParser(preferBaseSvType);
+                vcfLongrangerParser.setRemoveDuplicateVariants(true);
+                vcfLongrangerParser.parseResultFile(cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT), "\t");
+                otherParsers.add(vcfLongrangerParser);
+                otherLabels.add("vcf-longranger");
+            }
+
+            if (otherParsers.size() == 0) {
+                System.out.println("At least one HTS input source must be present. Exiting...");
+                System.exit(1);
+            }
+
             SvResultParser bionanoParser = new BionanoPipelineResultParser();
             bionanoParser.setRemoveDuplicateVariants(true);
             bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
 
-            SvResultParser annotsvParser = new AnnotSvTsvParser(preferBaseSvType);
-            annotsvParser.setRemoveDuplicateVariants(true);
-            annotsvParser.parseResultFile(cmd.getOptionValue(ARG_ANNOTSV_INPUT), "\t");
-
-            SvResultParser samplotParser = new SamplotCsvParser();
-            samplotParser.setRemoveDuplicateVariants(true);
-            samplotParser.parseResultFile(cmd.getOptionValue(ARG_SAMPLOT_INPUT), "\t");
-
-            List<SvResultParser> otherParsers = Arrays.asList(annotsvParser, samplotParser);
-            List<String> otherLabels = Arrays.asList("annotsv", "samplot");
             MultipleSvComparator svComparator = new MultipleSvComparator();
-            svComparator.compareStructuralVariants(bionanoParser, "bionano", otherParsers, otherLabels,
-                    cmd.getOptionValue(ARG_OUTPUT));
-
             svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
             svComparator.setDistanceVariance(variantDistance);
             svComparator.setVariantType(variantType);
             svComparator.setMinimalProportion(minimalProportion);
+            svComparator.compareStructuralVariants(bionanoParser, "bionano", otherParsers, otherLabels,
+                    cmd.getOptionValue(ARG_OUTPUT));
 
             bionanoParser.printStructuralVariantStats();
-            annotsvParser.printStructuralVariantStats();
-            samplotParser.printStructuralVariantStats();
+
+            if (cmd.hasOption(ARG_ANNOTSV_INPUT))
+                annotsvParser.printStructuralVariantStats();
+
+            if (cmd.hasOption(ARG_SAMPLOT_INPUT))
+                samplotParser.printStructuralVariantStats();
+
+            if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT))
+                vcfLongrangerParser.printStructuralVariantStats();
 
         }
         catch (Exception e) {
-            System.out.println("Error occurred:");
-            System.out.println(e.getMessage());
+            System.err.println("Error occurred: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -104,16 +133,19 @@ public class BionanoHtsSvComparator {
         options.addOption(bionanoInput);
 
         Option annotsvInput = new Option("a", ARG_ANNOTSV_INPUT, true, "annotsv tsv file path");
-        annotsvInput.setRequired(true);
         annotsvInput.setArgName("tsv file");
         annotsvInput.setType(String.class);
         options.addOption(annotsvInput);
 
         Option samplotVariants = new Option("s", ARG_SAMPLOT_INPUT, true, "samplot csv variants file path");
-        samplotVariants.setRequired(true);
         samplotVariants.setArgName("csv file");
         samplotVariants.setType(String.class);
         options.addOption(samplotVariants);
+
+        Option vcfLongrangerInput = new Option("vl", ARG_VCF_LONGRANGER_INPUT, true, "longranger vcf variants file path");
+        vcfLongrangerInput.setArgName("vcf file");
+        vcfLongrangerInput.setType(String.class);
+        options.addOption(vcfLongrangerInput);
 
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
         geneIntersection.setRequired(false);
