@@ -26,7 +26,7 @@
 package cz.vsb.genetics.svc.hts.main;
 
 import cz.vsb.genetics.ngs.sv.AnnotSvTsvParser;
-import cz.vsb.genetics.ngs.sv.LongRangerVcfParser;
+import cz.vsb.genetics.ngs.sv.GenericSvVcfParser;
 import cz.vsb.genetics.ngs.sv.SamplotCsvParser;
 import cz.vsb.genetics.om.sv.BionanoPipelineResultParser;
 import cz.vsb.genetics.sv.MultipleSvComparator;
@@ -41,6 +41,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
     private static final String ARG_SAMPLOT_INPUT = "samplot_input";
     private static final String ARG_VCF_LONGRANGER_INPUT = "vcf_longranger_input";
+    private static final String ARG_VCF_SNIFFLES_INPUT = "vcf_sniffles_input";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
@@ -49,73 +50,9 @@ public class BionanoHtsSvComparator {
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
-        CommandLine cmd = getCommandLine(args);
-
         try {
-            Long variantDistance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
-            Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
-            Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
-            boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
-            boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
-
-            List<SvResultParser> otherParsers = new ArrayList<>();
-            List<String> otherLabels = new ArrayList<>();
-
-            SvResultParser annotsvParser = null;
-            if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
-                annotsvParser = new AnnotSvTsvParser(preferBaseSvType);
-                annotsvParser.setRemoveDuplicateVariants(true);
-                annotsvParser.parseResultFile(cmd.getOptionValue(ARG_ANNOTSV_INPUT), "\t");
-                otherParsers.add(annotsvParser);
-                otherLabels.add("annotsv");
-            }
-
-            SvResultParser samplotParser = null;
-            if (cmd.hasOption(ARG_SAMPLOT_INPUT)) {
-                samplotParser = new SamplotCsvParser();
-                samplotParser.setRemoveDuplicateVariants(true);
-                samplotParser.parseResultFile(cmd.getOptionValue(ARG_SAMPLOT_INPUT), "\t");
-                otherParsers.add(samplotParser);
-                otherLabels.add("samplot");
-            }
-
-            SvResultParser vcfLongrangerParser = null;
-            if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
-                vcfLongrangerParser = new LongRangerVcfParser(preferBaseSvType);
-                vcfLongrangerParser.setRemoveDuplicateVariants(true);
-                vcfLongrangerParser.parseResultFile(cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT), "\t");
-                otherParsers.add(vcfLongrangerParser);
-                otherLabels.add("vcf-longranger");
-            }
-
-            if (otherParsers.size() == 0) {
-                System.out.println("At least one HTS input source must be present. Exiting...");
-                System.exit(1);
-            }
-
-            SvResultParser bionanoParser = new BionanoPipelineResultParser();
-            bionanoParser.setRemoveDuplicateVariants(true);
-            bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
-
-            MultipleSvComparator svComparator = new MultipleSvComparator();
-            svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
-            svComparator.setDistanceVariance(variantDistance);
-            svComparator.setVariantType(variantType);
-            svComparator.setMinimalProportion(minimalProportion);
-            svComparator.compareStructuralVariants(bionanoParser, "bionano", otherParsers, otherLabels,
-                    cmd.getOptionValue(ARG_OUTPUT));
-
-            bionanoParser.printStructuralVariantStats();
-
-            if (cmd.hasOption(ARG_ANNOTSV_INPUT))
-                annotsvParser.printStructuralVariantStats();
-
-            if (cmd.hasOption(ARG_SAMPLOT_INPUT))
-                samplotParser.printStructuralVariantStats();
-
-            if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT))
-                vcfLongrangerParser.printStructuralVariantStats();
-
+            BionanoHtsSvComparator comparator = new BionanoHtsSvComparator();
+            comparator.compareVariants(args);
         }
         catch (Exception e) {
             System.err.println("Error occurred: " + e.getMessage());
@@ -123,7 +60,36 @@ public class BionanoHtsSvComparator {
         }
     }
 
-    private static CommandLine getCommandLine(String[] args) {
+    public void compareVariants(String[] args) throws Exception {
+        CommandLine cmd = getCommandLine(args);
+
+        Long variantDistance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
+        Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
+        Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
+        boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
+
+        List<SvResultParser> otherParsers = getOtherParsers(cmd);
+
+        if (otherParsers.size() == 0) {
+            System.out.println("At least one HTS input source must be present. Exiting...");
+            System.exit(1);
+        }
+
+        SvResultParser bionanoParser = new BionanoPipelineResultParser("bionano");
+        bionanoParser.setRemoveDuplicateVariants(true);
+        bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
+
+        MultipleSvComparator svComparator = new MultipleSvComparator();
+        svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
+        svComparator.setDistanceVariance(variantDistance);
+        svComparator.setVariantType(variantType);
+        svComparator.setMinimalProportion(minimalProportion);
+        svComparator.compareStructuralVariants(bionanoParser, otherParsers, cmd.getOptionValue(ARG_OUTPUT));
+
+        printStructuralVariants(bionanoParser, otherParsers);
+    }
+
+    private CommandLine getCommandLine(String[] args) {
         Options options = new Options();
 
         Option bionanoInput = new Option("b", ARG_BIONANO_INPUT, true, "bionano pipeline result file path (smap)");
@@ -146,6 +112,11 @@ public class BionanoHtsSvComparator {
         vcfLongrangerInput.setArgName("vcf file");
         vcfLongrangerInput.setType(String.class);
         options.addOption(vcfLongrangerInput);
+
+        Option vcfSnifflesInput = new Option("vs", ARG_VCF_SNIFFLES_INPUT, true, "sniffles vcf variants file path");
+        vcfSnifflesInput.setArgName("vcf file");
+        vcfSnifflesInput.setType(String.class);
+        options.addOption(vcfSnifflesInput);
 
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
         geneIntersection.setRequired(false);
@@ -203,6 +174,49 @@ public class BionanoHtsSvComparator {
         }
 
         return cmd;
+    }
+
+    private List<SvResultParser> getOtherParsers(CommandLine cmd) throws Exception {
+        boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
+
+        List<SvResultParser> otherParsers = new ArrayList<>();
+
+        if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
+            SvResultParser annotsvParser = new AnnotSvTsvParser("annotsv", preferBaseSvType);
+            annotsvParser.setRemoveDuplicateVariants(true);
+            annotsvParser.parseResultFile(cmd.getOptionValue(ARG_ANNOTSV_INPUT), "\t");
+            otherParsers.add(annotsvParser);
+        }
+
+        if (cmd.hasOption(ARG_SAMPLOT_INPUT)) {
+            SvResultParser samplotParser = new SamplotCsvParser("samplot");
+            samplotParser.setRemoveDuplicateVariants(true);
+            samplotParser.parseResultFile(cmd.getOptionValue(ARG_SAMPLOT_INPUT), "\t");
+            otherParsers.add(samplotParser);
+        }
+
+        if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
+            SvResultParser vcfLongrangerParser = new GenericSvVcfParser("vcf-longranger");
+            vcfLongrangerParser.setRemoveDuplicateVariants(true);
+            vcfLongrangerParser.parseResultFile(cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT), "\t");
+            otherParsers.add(vcfLongrangerParser);
+        }
+
+        if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
+            SvResultParser vcfSnifflesParser = new GenericSvVcfParser("vcf-sniffles");
+            vcfSnifflesParser.setRemoveDuplicateVariants(true);
+            vcfSnifflesParser.parseResultFile(cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT), "\t");
+            otherParsers.add(vcfSnifflesParser);
+        }
+
+        return otherParsers;
+    }
+
+    private void printStructuralVariants(SvResultParser bionanoParser, List<SvResultParser> otherParsers) {
+        bionanoParser.printStructuralVariantStats();
+
+        for (SvResultParser otherParser : otherParsers)
+            otherParser.printStructuralVariantStats();
     }
 
     private static String version() {
