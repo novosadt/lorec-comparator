@@ -42,6 +42,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_SAMPLOT_INPUT = "samplot_input";
     private static final String ARG_VCF_LONGRANGER_INPUT = "vcf_longranger_input";
     private static final String ARG_VCF_SNIFFLES_INPUT = "vcf_sniffles_input";
+    private static final String ARG_VCF_MANTA_INPUT = "vcf_manta_input";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
@@ -117,6 +118,11 @@ public class BionanoHtsSvComparator {
         vcfSnifflesInput.setArgName("vcf file");
         vcfSnifflesInput.setType(String.class);
         options.addOption(vcfSnifflesInput);
+
+        Option vcfMantaInput = new Option("vm", ARG_VCF_MANTA_INPUT, true, "manta vcf variants file path");
+        vcfMantaInput.setArgName("vcf file");
+        vcfMantaInput.setType(String.class);
+        options.addOption(vcfMantaInput);
 
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
         geneIntersection.setRequired(false);
@@ -207,6 +213,13 @@ public class BionanoHtsSvComparator {
             vcfSnifflesParser.setRemoveDuplicateVariants(true);
             vcfSnifflesParser.parseResultFile(cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT), "\t");
             otherParsers.add(vcfSnifflesParser);
+        }
+
+        if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
+            SvResultParser vcfMantaParser = new GenericSvVcfParser("vcf-manta");
+            vcfMantaParser.setRemoveDuplicateVariants(true);
+            vcfMantaParser.parseResultFile(cmd.getOptionValue(ARG_VCF_MANTA_INPUT), "\t");
+            otherParsers.add(vcfMantaParser);
         }
 
         return otherParsers;
