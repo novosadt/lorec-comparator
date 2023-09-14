@@ -33,8 +33,13 @@ import cz.vsb.genetics.sv.MultipleSvComparator;
 import cz.vsb.genetics.sv.StructuralVariantType;
 import cz.vsb.genetics.sv.SvResultParser;
 import org.apache.commons.cli.*;
+import org.apache.commons.io.FilenameUtils;
 
-import java.util.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 
 public class BionanoHtsSvComparator {
     private static final String ARG_BIONANO_INPUT = "bionano_input";
@@ -99,27 +104,27 @@ public class BionanoHtsSvComparator {
         bionanoInput.setType(String.class);
         options.addOption(bionanoInput);
 
-        Option annotsvInput = new Option("a", ARG_ANNOTSV_INPUT, true, "annotsv tsv file path");
+        Option annotsvInput = new Option("a", ARG_ANNOTSV_INPUT, true, "annotsv tsv file paths delimited by ;");
         annotsvInput.setArgName("tsv file");
         annotsvInput.setType(String.class);
         options.addOption(annotsvInput);
 
-        Option samplotVariants = new Option("s", ARG_SAMPLOT_INPUT, true, "samplot csv variants file path");
+        Option samplotVariants = new Option("s", ARG_SAMPLOT_INPUT, true, "samplot csv variants file paths delimited by ;");
         samplotVariants.setArgName("csv file");
         samplotVariants.setType(String.class);
         options.addOption(samplotVariants);
 
-        Option vcfLongrangerInput = new Option("vl", ARG_VCF_LONGRANGER_INPUT, true, "longranger vcf variants file path");
+        Option vcfLongrangerInput = new Option("vl", ARG_VCF_LONGRANGER_INPUT, true, "longranger vcf variants file paths delimited by ;");
         vcfLongrangerInput.setArgName("vcf file");
         vcfLongrangerInput.setType(String.class);
         options.addOption(vcfLongrangerInput);
 
-        Option vcfSnifflesInput = new Option("vs", ARG_VCF_SNIFFLES_INPUT, true, "sniffles vcf variants file path");
+        Option vcfSnifflesInput = new Option("vs", ARG_VCF_SNIFFLES_INPUT, true, "sniffles vcf variants file paths delimited by ;");
         vcfSnifflesInput.setArgName("vcf file");
         vcfSnifflesInput.setType(String.class);
         options.addOption(vcfSnifflesInput);
 
-        Option vcfMantaInput = new Option("vm", ARG_VCF_MANTA_INPUT, true, "manta vcf variants file path");
+        Option vcfMantaInput = new Option("vm", ARG_VCF_MANTA_INPUT, true, "manta vcf variants file paths delimited by ;");
         vcfMantaInput.setArgName("vcf file");
         vcfMantaInput.setType(String.class);
         options.addOption(vcfMantaInput);
@@ -188,41 +193,65 @@ public class BionanoHtsSvComparator {
         List<SvResultParser> otherParsers = new ArrayList<>();
 
         if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
-            SvResultParser annotsvParser = new AnnotSvTsvParser("annotsv", preferBaseSvType);
-            annotsvParser.setRemoveDuplicateVariants(true);
-            annotsvParser.parseResultFile(cmd.getOptionValue(ARG_ANNOTSV_INPUT), "\t");
-            otherParsers.add(annotsvParser);
+            String[] inputs = cmd.getOptionValue(ARG_ANNOTSV_INPUT).split(";");
+
+            for (String input : inputs) {
+                SvResultParser annotsvParser = new AnnotSvTsvParser("annotsv_" + getParserNameSuffix(input), preferBaseSvType);
+                annotsvParser.setRemoveDuplicateVariants(true);
+                annotsvParser.parseResultFile(input, "\t");
+                otherParsers.add(annotsvParser);
+            }
         }
 
         if (cmd.hasOption(ARG_SAMPLOT_INPUT)) {
-            SvResultParser samplotParser = new SamplotCsvParser("samplot");
-            samplotParser.setRemoveDuplicateVariants(true);
-            samplotParser.parseResultFile(cmd.getOptionValue(ARG_SAMPLOT_INPUT), "\t");
-            otherParsers.add(samplotParser);
+            String[] inputs = cmd.getOptionValue(ARG_SAMPLOT_INPUT).split(";");
+
+            for (String input : inputs) {
+                SvResultParser samplotParser = new SamplotCsvParser("samplot_" + getParserNameSuffix(input));
+                samplotParser.setRemoveDuplicateVariants(true);
+                samplotParser.parseResultFile(input, "\t");
+                otherParsers.add(samplotParser);
+            }
         }
 
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
-            SvResultParser vcfLongrangerParser = new GenericSvVcfParser("vcf-longranger");
-            vcfLongrangerParser.setRemoveDuplicateVariants(true);
-            vcfLongrangerParser.parseResultFile(cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT), "\t");
-            otherParsers.add(vcfLongrangerParser);
+            String[] inputs = cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT).split(";");
+
+            for (String input : inputs) {
+                SvResultParser vcfLongrangerParser = new GenericSvVcfParser("vcf-longranger_" + getParserNameSuffix(input));
+                vcfLongrangerParser.setRemoveDuplicateVariants(true);
+                vcfLongrangerParser.parseResultFile(input, "\t");
+                otherParsers.add(vcfLongrangerParser);
+            }
         }
 
         if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
-            SvResultParser vcfSnifflesParser = new GenericSvVcfParser("vcf-sniffles");
-            vcfSnifflesParser.setRemoveDuplicateVariants(true);
-            vcfSnifflesParser.parseResultFile(cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT), "\t");
-            otherParsers.add(vcfSnifflesParser);
+            String[] inputs = cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT).split(";");
+
+            for (String input : inputs) {
+                SvResultParser vcfSnifflesParser = new GenericSvVcfParser("vcf-sniffles_" + getParserNameSuffix(input));
+                vcfSnifflesParser.setRemoveDuplicateVariants(true);
+                vcfSnifflesParser.parseResultFile(input, "\t");
+                otherParsers.add(vcfSnifflesParser);
+            }
         }
 
         if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
-            SvResultParser vcfMantaParser = new GenericSvVcfParser("vcf-manta");
-            vcfMantaParser.setRemoveDuplicateVariants(true);
-            vcfMantaParser.parseResultFile(cmd.getOptionValue(ARG_VCF_MANTA_INPUT), "\t");
-            otherParsers.add(vcfMantaParser);
+            String[] inputs = cmd.getOptionValue(ARG_VCF_MANTA_INPUT).split(";");
+
+            for (String input : inputs) {
+                SvResultParser vcfMantaParser = new GenericSvVcfParser("vcf-manta_" + getParserNameSuffix(input));
+                vcfMantaParser.setRemoveDuplicateVariants(true);
+                vcfMantaParser.parseResultFile(input, "\t");
+                otherParsers.add(vcfMantaParser);
+            }
         }
 
         return otherParsers;
+    }
+
+    private String getParserNameSuffix(String name) {
+        return FilenameUtils.removeExtension(new File(name).getName());
     }
 
     private void printStructuralVariants(SvResultParser bionanoParser, List<SvResultParser> otherParsers) {
