@@ -36,10 +36,7 @@ import org.apache.commons.cli.*;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
 public class BionanoHtsSvComparator {
     private static final String ARG_BIONANO_INPUT = "bionano_input";
@@ -53,6 +50,8 @@ public class BionanoHtsSvComparator {
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
     private static final String ARG_GENE_INTERSECTION = "gene_intersection";
     private static final String ARG_PREFER_BASE_SVTYPE = "prefer_base_svtype";
+    private static final String ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT = "distance_variance_statistics_output";
+    private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
@@ -73,6 +72,9 @@ public class BionanoHtsSvComparator {
         Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
         Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
         boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
+        String distanceVarianceStatsOutput = cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT);
+        String[] distanceVarianceStatsCounts = cmd.hasOption(ARG_DISTANCE_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS).split(";") : null;
+        boolean calculateDistanceVarianceStats = distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0 && distanceVarianceStatsOutput != null;
 
         List<SvResultParser> otherParsers = getOtherParsers(cmd);
 
@@ -87,12 +89,21 @@ public class BionanoHtsSvComparator {
 
         MultipleSvComparator svComparator = new MultipleSvComparator();
         svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
-        svComparator.setDistanceVariance(variantDistance);
+        svComparator.setDistanceVarianceThreshold(variantDistance);
         svComparator.setVariantType(variantType);
         svComparator.setMinimalProportion(minimalProportion);
+
+        if (calculateDistanceVarianceStats) {
+            svComparator.setCalculateDistanceVarianceStats(true);
+            svComparator.setDistanceVarianceBasesCounts(Arrays.stream(distanceVarianceStatsCounts).mapToInt(Integer::parseInt).toArray());
+        }
+
         svComparator.compareStructuralVariants(bionanoParser, otherParsers, cmd.getOptionValue(ARG_OUTPUT));
 
         printStructuralVariants(bionanoParser, otherParsers);
+
+        if (calculateDistanceVarianceStats)
+            svComparator.saveDistanceVarianceStatistics(distanceVarianceStatsOutput);
     }
 
     private CommandLine getCommandLine(String[] args) {
@@ -104,27 +115,27 @@ public class BionanoHtsSvComparator {
         bionanoInput.setType(String.class);
         options.addOption(bionanoInput);
 
-        Option annotsvInput = new Option("a", ARG_ANNOTSV_INPUT, true, "annotsv tsv file paths delimited by ;");
+        Option annotsvInput = new Option("a", ARG_ANNOTSV_INPUT, true, "annotsv tsv file paths delimited by semicolon");
         annotsvInput.setArgName("tsv file");
         annotsvInput.setType(String.class);
         options.addOption(annotsvInput);
 
-        Option samplotVariants = new Option("s", ARG_SAMPLOT_INPUT, true, "samplot csv variants file paths delimited by ;");
+        Option samplotVariants = new Option("s", ARG_SAMPLOT_INPUT, true, "samplot csv variants file paths delimited by semicolon");
         samplotVariants.setArgName("csv file");
         samplotVariants.setType(String.class);
         options.addOption(samplotVariants);
 
-        Option vcfLongrangerInput = new Option("vl", ARG_VCF_LONGRANGER_INPUT, true, "longranger vcf variants file paths delimited by ;");
+        Option vcfLongrangerInput = new Option("vl", ARG_VCF_LONGRANGER_INPUT, true, "longranger vcf variants file paths delimited by semicolon");
         vcfLongrangerInput.setArgName("vcf file");
         vcfLongrangerInput.setType(String.class);
         options.addOption(vcfLongrangerInput);
 
-        Option vcfSnifflesInput = new Option("vs", ARG_VCF_SNIFFLES_INPUT, true, "sniffles vcf variants file paths delimited by ;");
+        Option vcfSnifflesInput = new Option("vs", ARG_VCF_SNIFFLES_INPUT, true, "sniffles vcf variants file paths delimited by semicolon");
         vcfSnifflesInput.setArgName("vcf file");
         vcfSnifflesInput.setType(String.class);
         options.addOption(vcfSnifflesInput);
 
-        Option vcfMantaInput = new Option("vm", ARG_VCF_MANTA_INPUT, true, "manta vcf variants file paths delimited by ;");
+        Option vcfMantaInput = new Option("vm", ARG_VCF_MANTA_INPUT, true, "manta vcf variants file paths delimited by semicolon");
         vcfMantaInput.setArgName("vcf file");
         vcfMantaInput.setType(String.class);
         options.addOption(vcfMantaInput);
@@ -137,7 +148,7 @@ public class BionanoHtsSvComparator {
         svType.setRequired(false);
         options.addOption(svType);
 
-        Option variantType = new Option("t", ARG_VARIANT_TYPE, true, "variant type filter, any combination of [BND,CNV,DEL,INS,DUP,INV,UNK], comma separated");
+        Option variantType = new Option("t", ARG_VARIANT_TYPE, true, "variant type filter, any combination of [BND,CNV,DEL,INS,DUP,INV,UNK], delimited by semicolon");
         variantType.setType(String.class);
         variantType.setArgName("sv types");
         variantType.setRequired(false);
@@ -155,11 +166,24 @@ public class BionanoHtsSvComparator {
         minimalProportion.setRequired(false);
         options.addOption(minimalProportion);
 
+        Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - number of bases delimited by semicolon (e.g. 10000;50000;100000)");
+        distanceVarianceStats.setType(Long.class);
+        distanceVarianceStats.setArgName("number of bases");
+        distanceVarianceStats.setRequired(false);
+        options.addOption(distanceVarianceStats);
+
+        Option statistics = new Option("dvso", ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT, true, "calculate distance variance statistics structural variants");
+        statistics.setArgName("statistics output file");
+        statistics.setType(String.class);
+        options.addOption(statistics);
+
         Option output = new Option("o", ARG_OUTPUT, true, "output result file");
         output.setRequired(true);
         output.setArgName("csv file");
         output.setType(String.class);
         options.addOption(output);
+
+
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
