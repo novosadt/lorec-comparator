@@ -45,6 +45,8 @@ public class BionanoHtsSvComparator {
     private static final String ARG_VCF_LONGRANGER_INPUT = "vcf_longranger_input";
     private static final String ARG_VCF_SNIFFLES_INPUT = "vcf_sniffles_input";
     private static final String ARG_VCF_MANTA_INPUT = "vcf_manta_input";
+    private static final String ARG_VCF_ICLR_INPUT = "vcf_iclr_input";
+    private static final String ARG_VCF_FILTER_PASS = "vcf_filter_pass";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
@@ -140,18 +142,23 @@ public class BionanoHtsSvComparator {
         vcfMantaInput.setType(String.class);
         options.addOption(vcfMantaInput);
 
+        Option vcfIclrInput = new Option("vi", ARG_VCF_ICLR_INPUT, true, "Illumina Dragen ICLR wgs vcf variants file paths delimited by semicolon");
+        vcfIclrInput.setArgName("vcf file");
+        vcfIclrInput.setType(String.class);
+        options.addOption(vcfIclrInput);
+
+        Option vcfFilterPass = new Option("vfp", ARG_VCF_FILTER_PASS, false, "Process only structural variants with filter value PASS");
+        options.addOption(vcfFilterPass);
+
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
-        geneIntersection.setRequired(false);
         options.addOption(geneIntersection);
 
         Option svType = new Option("svt", ARG_PREFER_BASE_SVTYPE, false, "whether to prefer base variant type (SVTYPE) in case of BND and 10x/TELL-Seq (default false i.e. SVTYPE2)");
-        svType.setRequired(false);
         options.addOption(svType);
 
         Option variantType = new Option("t", ARG_VARIANT_TYPE, true, "variant type filter, any combination of [BND,CNV,DEL,INS,DUP,INV,UNK], delimited by semicolon");
         variantType.setType(String.class);
         variantType.setArgName("sv types");
-        variantType.setRequired(false);
         options.addOption(variantType);
 
         Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
@@ -213,6 +220,7 @@ public class BionanoHtsSvComparator {
 
     private List<SvResultParser> getOtherParsers(CommandLine cmd) throws Exception {
         boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
+        boolean vcfFilterPass = cmd.hasOption(ARG_VCF_FILTER_PASS);
 
         List<SvResultParser> otherParsers = new ArrayList<>();
 
@@ -241,37 +249,41 @@ public class BionanoHtsSvComparator {
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT).split(";");
 
-            for (String input : inputs) {
-                SvResultParser vcfLongrangerParser = new GenericSvVcfParser("vcf-longranger_" + getParserNameSuffix(input));
-                vcfLongrangerParser.setRemoveDuplicateVariants(true);
-                vcfLongrangerParser.parseResultFile(input, "\t");
-                otherParsers.add(vcfLongrangerParser);
-            }
+            for (String input : inputs)
+                addVcfOtherParser("vcf-longranger_", input, vcfFilterPass, preferBaseSvType, otherParsers);
         }
 
         if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT).split(";");
 
-            for (String input : inputs) {
-                SvResultParser vcfSnifflesParser = new GenericSvVcfParser("vcf-sniffles_" + getParserNameSuffix(input));
-                vcfSnifflesParser.setRemoveDuplicateVariants(true);
-                vcfSnifflesParser.parseResultFile(input, "\t");
-                otherParsers.add(vcfSnifflesParser);
-            }
+            for (String input : inputs)
+                addVcfOtherParser("vcf-sniffles_", input, vcfFilterPass, preferBaseSvType, otherParsers);
         }
 
         if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_MANTA_INPUT).split(";");
 
-            for (String input : inputs) {
-                SvResultParser vcfMantaParser = new GenericSvVcfParser("vcf-manta_" + getParserNameSuffix(input));
-                vcfMantaParser.setRemoveDuplicateVariants(true);
-                vcfMantaParser.parseResultFile(input, "\t");
-                otherParsers.add(vcfMantaParser);
-            }
+            for (String input : inputs)
+                addVcfOtherParser("vcf-manta_", input, vcfFilterPass, preferBaseSvType, otherParsers);
+        }
+
+        if (cmd.hasOption(ARG_VCF_ICLR_INPUT)) {
+            String[] inputs = cmd.getOptionValue(ARG_VCF_ICLR_INPUT).split(";");
+
+            for (String input : inputs)
+                addVcfOtherParser("vcf-iclr_", input, vcfFilterPass, preferBaseSvType, otherParsers);
         }
 
         return otherParsers;
+    }
+
+    private void addVcfOtherParser(String namePrefix, String input, boolean vcfFilterPass, boolean preferBaseSvType, List<SvResultParser> otherParsers) throws Exception {
+        GenericSvVcfParser vcfParser = new GenericSvVcfParser(namePrefix + getParserNameSuffix(input));
+        vcfParser.setOnlyFilterPass(vcfFilterPass);
+        vcfParser.setPreferBaseSvType(preferBaseSvType);
+        vcfParser.setRemoveDuplicateVariants(true);
+        vcfParser.parseResultFile(input, "\t");
+        otherParsers.add(vcfParser);
     }
 
     private String getParserNameSuffix(String name) {
