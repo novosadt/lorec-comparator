@@ -49,11 +49,13 @@ public class BionanoHtsSvComparator {
     private static final String ARG_VCF_FILTER_PASS = "vcf_filter_pass";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
+    private static final String ARG_INTERSECTION_VARIANCE = "intersection_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
     private static final String ARG_GENE_INTERSECTION = "gene_intersection";
     private static final String ARG_PREFER_BASE_SVTYPE = "prefer_base_svtype";
-    private static final String ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT = "distance_variance_statistics_output";
+    private static final String ARG_STATISTICS_OUTPUT = "statistics_output";
     private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
+    private static final String ARG_INTERSECTION_VARIANCE_STATISTICS = "intersection_variance_statistics";
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
@@ -70,13 +72,18 @@ public class BionanoHtsSvComparator {
     public void compareVariants(String[] args) throws Exception {
         CommandLine cmd = getCommandLine(args);
 
-        Long variantDistance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
+        Long distanceVariance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
+        Double intersectionVariance = cmd.hasOption(ARG_INTERSECTION_VARIANCE) ? new Double(cmd.getOptionValue(ARG_INTERSECTION_VARIANCE)) : null;
         Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
         Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
         boolean onlyCommonGeneVariants = cmd.hasOption(ARG_GENE_INTERSECTION);
-        String distanceVarianceStatsOutput = cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT);
+        String statsOutput = cmd.getOptionValue(ARG_STATISTICS_OUTPUT);
         String[] distanceVarianceStatsCounts = cmd.hasOption(ARG_DISTANCE_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS).split(";") : null;
-        boolean calculateDistanceVarianceStats = distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0 && distanceVarianceStatsOutput != null;
+        String[] intersectionVarianceStatsThreshold = cmd.hasOption(ARG_INTERSECTION_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_INTERSECTION_VARIANCE_STATISTICS).split(";") : null;
+
+        boolean calculateDistanceVarianceStats = statsOutput != null &&
+                ((distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0) ||
+                 (intersectionVarianceStatsThreshold != null && intersectionVarianceStatsThreshold.length > 0));
 
         List<SvResultParser> otherParsers = getOtherParsers(cmd);
 
@@ -91,13 +98,19 @@ public class BionanoHtsSvComparator {
 
         MultipleSvComparator svComparator = new MultipleSvComparator();
         svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
-        svComparator.setDistanceVarianceThreshold(variantDistance);
-        svComparator.setVariantType(variantType);
+        svComparator.setDistanceVarianceThreshold(distanceVariance);
+        svComparator.setIntersectionVarianceThreshold(intersectionVariance);
+        svComparator.setVariantTypes(variantType);
         svComparator.setMinimalProportion(minimalProportion);
 
         if (calculateDistanceVarianceStats) {
-            svComparator.setCalculateDistanceVarianceStats(true);
-            svComparator.setDistanceVarianceBasesCounts(Arrays.stream(distanceVarianceStatsCounts).mapToInt(Integer::parseInt).toArray());
+            svComparator.setCalculateStructuralVariantStats(true);
+
+            if (distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0)
+                svComparator.setDistanceVarianceBasesCounts(Arrays.stream(distanceVarianceStatsCounts).mapToInt(Integer::parseInt).toArray());
+
+            if (intersectionVarianceStatsThreshold != null && intersectionVarianceStatsThreshold.length > 0)
+                svComparator.setIntersectionVarianceThresholds(Arrays.stream(intersectionVarianceStatsThreshold).mapToDouble(Double::parseDouble).toArray());
         }
 
         svComparator.compareStructuralVariants(bionanoParser, otherParsers, cmd.getOptionValue(ARG_OUTPUT));
@@ -105,7 +118,7 @@ public class BionanoHtsSvComparator {
         printStructuralVariants(bionanoParser, otherParsers);
 
         if (calculateDistanceVarianceStats)
-            svComparator.saveDistanceVarianceStatistics(distanceVarianceStatsOutput);
+            svComparator.saveStructuralVariantStats(statsOutput);
     }
 
     private CommandLine getCommandLine(String[] args) {
@@ -163,9 +176,15 @@ public class BionanoHtsSvComparator {
 
         Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
         distanceVariance.setType(Long.class);
-        distanceVariance.setArgName("number");
+        distanceVariance.setArgName("number of bases");
         distanceVariance.setRequired(false);
         options.addOption(distanceVariance);
+
+        Option intersectionVariance = new Option("i", ARG_INTERSECTION_VARIANCE, true, "intersection variance filter - threshold difference between variant from NGS and OM");
+        intersectionVariance.setType(Long.class);
+        intersectionVariance.setArgName("threshold");
+        intersectionVariance.setRequired(false);
+        options.addOption(intersectionVariance);
 
         Option minimalProportion = new Option("mp", ARG_MINIMAL_PROPORTION, true, "minimal proportion filter - minimal proportion of target variant within query variant (0.0 - 1.0)");
         minimalProportion.setType(Double.class);
@@ -179,18 +198,22 @@ public class BionanoHtsSvComparator {
         distanceVarianceStats.setRequired(false);
         options.addOption(distanceVarianceStats);
 
-        Option statistics = new Option("dvso", ARG_DISTANCE_VARIANCE_STATISTICS_OUTPUT, true, "calculate distance variance statistics structural variants");
-        statistics.setArgName("statistics output file");
-        statistics.setType(String.class);
-        options.addOption(statistics);
+        Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - threshold delimited by semicolon (e.g. 0.1;0.3;0.5)");
+        intersectionVarianceStats.setType(Long.class);
+        intersectionVarianceStats.setArgName("threshold");
+        intersectionVarianceStats.setRequired(false);
+        options.addOption(intersectionVarianceStats);
+
+        Option statsOutput = new Option("so", ARG_STATISTICS_OUTPUT, true, "output structural variants statistics file");
+        statsOutput.setArgName("csv file");
+        statsOutput.setType(String.class);
+        options.addOption(statsOutput);
 
         Option output = new Option("o", ARG_OUTPUT, true, "output result file");
         output.setRequired(true);
         output.setArgName("csv file");
         output.setType(String.class);
         options.addOption(output);
-
-
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
