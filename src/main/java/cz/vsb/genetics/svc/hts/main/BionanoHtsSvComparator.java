@@ -25,6 +25,7 @@
 
 package cz.vsb.genetics.svc.hts.main;
 
+import cz.vsb.genetics.common.ChromosomeRegion;
 import cz.vsb.genetics.ngs.sv.AnnotSvTsvParser;
 import cz.vsb.genetics.ngs.sv.GenericSvVcfParser;
 import cz.vsb.genetics.ngs.sv.SamplotCsvParser;
@@ -34,11 +35,18 @@ import cz.vsb.genetics.sv.StructuralVariantType;
 import cz.vsb.genetics.sv.SvResultParser;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.util.*;
 
 public class BionanoHtsSvComparator {
+    private static final Logger log = LoggerFactory.getLogger(BionanoHtsSvComparator.class);
+
     private static final String ARG_BIONANO_INPUT = "bionano_input";
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
     private static final String ARG_SAMPLOT_INPUT = "samplot_input";
@@ -56,6 +64,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_STATISTICS_OUTPUT = "statistics_output";
     private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
     private static final String ARG_INTERSECTION_VARIANCE_STATISTICS = "intersection_variance_statistics";
+    private static final String ARG_REGION_FILTER_FILE = "region_filter_file";
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
@@ -72,7 +81,7 @@ public class BionanoHtsSvComparator {
     public void compareVariants(String[] args) throws Exception {
         CommandLine cmd = getCommandLine(args);
 
-        Long distanceVariance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? new Long(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
+        Integer distanceVariance = cmd.hasOption(ARG_DISTANCE_VARIANCE) ? Integer.valueOf(cmd.getOptionValue(ARG_DISTANCE_VARIANCE)) : null;
         Double intersectionVariance = cmd.hasOption(ARG_INTERSECTION_VARIANCE) ? new Double(cmd.getOptionValue(ARG_INTERSECTION_VARIANCE)) : null;
         Double minimalProportion = cmd.hasOption(ARG_MINIMAL_PROPORTION) ? new Double(cmd.getOptionValue(ARG_MINIMAL_PROPORTION)) : null;
         Set<StructuralVariantType> variantType = cmd.hasOption(ARG_VARIANT_TYPE) ? StructuralVariantType.getSvTypes(cmd.getOptionValue(ARG_VARIANT_TYPE)) : null;
@@ -102,6 +111,7 @@ public class BionanoHtsSvComparator {
         svComparator.setIntersectionVarianceThreshold(intersectionVariance);
         svComparator.setVariantTypes(variantType);
         svComparator.setMinimalProportion(minimalProportion);
+        svComparator.setExcludedRegions(getExcludedRegions(cmd.getOptionValue(ARG_REGION_FILTER_FILE)));
 
         if (calculateDistanceVarianceStats) {
             svComparator.setCalculateStructuralVariantStats(true);
@@ -175,13 +185,13 @@ public class BionanoHtsSvComparator {
         options.addOption(variantType);
 
         Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
-        distanceVariance.setType(Long.class);
+        distanceVariance.setType(Integer.class);
         distanceVariance.setArgName("number of bases");
         distanceVariance.setRequired(false);
         options.addOption(distanceVariance);
 
         Option intersectionVariance = new Option("i", ARG_INTERSECTION_VARIANCE, true, "intersection variance filter - threshold difference between variant from NGS and OM");
-        intersectionVariance.setType(Long.class);
+        intersectionVariance.setType(Integer.class);
         intersectionVariance.setArgName("threshold");
         intersectionVariance.setRequired(false);
         options.addOption(intersectionVariance);
@@ -193,13 +203,13 @@ public class BionanoHtsSvComparator {
         options.addOption(minimalProportion);
 
         Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - number of bases delimited by semicolon (e.g. 10000;50000;100000)");
-        distanceVarianceStats.setType(Long.class);
+        distanceVarianceStats.setType(Integer.class);
         distanceVarianceStats.setArgName("number of bases");
         distanceVarianceStats.setRequired(false);
         options.addOption(distanceVarianceStats);
 
         Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - threshold delimited by semicolon (e.g. 0.1;0.3;0.5)");
-        intersectionVarianceStats.setType(Long.class);
+        intersectionVarianceStats.setType(Integer.class);
         intersectionVarianceStats.setArgName("threshold");
         intersectionVarianceStats.setRequired(false);
         options.addOption(intersectionVarianceStats);
@@ -208,6 +218,11 @@ public class BionanoHtsSvComparator {
         statsOutput.setArgName("csv file");
         statsOutput.setType(String.class);
         options.addOption(statsOutput);
+
+        Option regionFilterFile = new Option("rff", ARG_REGION_FILTER_FILE, true, "List of regions to be excluded from analysis (bed format, tab separated)");
+        regionFilterFile.setArgName("bed file");
+        regionFilterFile.setType(String.class);
+        options.addOption(regionFilterFile);
 
         Option output = new Option("o", ARG_OUTPUT, true, "output result file");
         output.setRequired(true);
@@ -326,5 +341,21 @@ public class BionanoHtsSvComparator {
         }
 
         return properties.getProperty("version");
+    }
+
+    private List<ChromosomeRegion> getExcludedRegions(String regionFilterFile) throws Exception {
+        if (StringUtils.isBlank(regionFilterFile))
+            return null;
+
+        List<ChromosomeRegion> regions = new ArrayList<>();
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(regionFilterFile))) {
+            String line;
+            while((line = reader.readLine()) != null) {
+                ChromosomeRegion region = ChromosomeRegion.valueOf(line, "\t");
+                regions.add(region);
+            }
+        }
+        return regions;
     }
 }
