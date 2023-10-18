@@ -353,7 +353,9 @@ public class BionanoHtsSvComparator {
             String line;
             while((line = reader.readLine()) != null) {
                 ChromosomeRegion region = ChromosomeRegion.valueOf(line, "\t");
-                regions.add(region);
+
+                if (region != null)
+                    regions.add(region);
             }
         }
         return regions;
