@@ -65,6 +65,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
     private static final String ARG_INTERSECTION_VARIANCE_STATISTICS = "intersection_variance_statistics";
     private static final String ARG_REGION_FILTER_FILE = "region_filter_file";
+    private static final String ARG_MAIN_DATASOURCE = "main_datasource";
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
