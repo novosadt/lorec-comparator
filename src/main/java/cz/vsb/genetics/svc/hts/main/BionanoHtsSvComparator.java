@@ -54,6 +54,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_VCF_SNIFFLES_INPUT = "vcf_sniffles_input";
     private static final String ARG_VCF_MANTA_INPUT = "vcf_manta_input";
     private static final String ARG_VCF_ICLR_INPUT = "vcf_iclr_input";
+    private static final String ARG_MAIN_INPUT = "main_input";
     private static final String ARG_VCF_FILTER_PASS = "vcf_filter_pass";
     private static final String ARG_VARIANT_TYPE = "variant_type";
     private static final String ARG_DISTANCE_VARIANCE = "distance_variance";
@@ -65,7 +66,6 @@ public class BionanoHtsSvComparator {
     private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
     private static final String ARG_INTERSECTION_VARIANCE_STATISTICS = "intersection_variance_statistics";
     private static final String ARG_REGION_FILTER_FILE = "region_filter_file";
-    private static final String ARG_MAIN_DATASOURCE = "main_datasource";
     private static final String ARG_OUTPUT = "output";
 
     public static void main(String[] args) {
@@ -170,6 +170,11 @@ public class BionanoHtsSvComparator {
         vcfIclrInput.setArgName("vcf file");
         vcfIclrInput.setType(String.class);
         options.addOption(vcfIclrInput);
+
+        Option mainInput = new Option("vi", ARG_MAIN_INPUT, true, "Main technology to compare with others [b|a|s|vl|vs|vm|vi]. (e.g. b - Bionano, vl - VCF Longranger, etc...)");
+        mainInput.setArgName("main technology");
+        mainInput.setType(String.class);
+        options.addOption(mainInput);
 
         Option vcfFilterPass = new Option("vfp", ARG_VCF_FILTER_PASS, false, "Process only structural variants with filter value PASS");
         options.addOption(vcfFilterPass);
