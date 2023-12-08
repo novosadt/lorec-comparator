@@ -43,6 +43,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class BionanoHtsSvComparator {
     private static final Logger log = LoggerFactory.getLogger(BionanoHtsSvComparator.class);
@@ -67,6 +68,9 @@ public class BionanoHtsSvComparator {
     private static final String ARG_INTERSECTION_VARIANCE_STATISTICS = "intersection_variance_statistics";
     private static final String ARG_REGION_FILTER_FILE = "region_filter_file";
     private static final String ARG_OUTPUT = "output";
+
+    private SvResultParser mainParser;
+    private final List<SvResultParser> otherParsers = new ArrayList<>();
 
     public static void main(String[] args) {
         try {
@@ -95,16 +99,12 @@ public class BionanoHtsSvComparator {
                 ((distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0) ||
                  (intersectionVarianceStatsThreshold != null && intersectionVarianceStatsThreshold.length > 0));
 
-        List<SvResultParser> otherParsers = getOtherParsers(cmd);
+        initParsers(cmd);
 
-        if (otherParsers.size() == 0) {
-            System.out.println("At least one HTS input source must be present. Exiting...");
+        if (mainParser == null || otherParsers.size() == 0) {
+            System.out.println("At least two input source (main, other) must be present. Exiting...");
             System.exit(1);
         }
-
-        SvResultParser bionanoParser = new BionanoPipelineResultParser("bionano");
-        bionanoParser.setRemoveDuplicateVariants(true);
-        bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
 
         MultipleSvComparator svComparator = new MultipleSvComparator();
         svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
@@ -124,9 +124,9 @@ public class BionanoHtsSvComparator {
                 svComparator.setIntersectionVarianceThresholds(Arrays.stream(intersectionVarianceStatsThreshold).mapToDouble(Double::parseDouble).toArray());
         }
 
-        svComparator.compareStructuralVariants(bionanoParser, otherParsers, cmd.getOptionValue(ARG_OUTPUT));
+        svComparator.compareStructuralVariants(mainParser, otherParsers, cmd.getOptionValue(ARG_OUTPUT));
 
-        printStructuralVariants(bionanoParser, otherParsers);
+        printStructuralVariants(mainParser, otherParsers);
 
         if (calculateDistanceVarianceStats)
             svComparator.saveStructuralVariantStats(statsOutput);
@@ -171,8 +171,8 @@ public class BionanoHtsSvComparator {
         vcfIclrInput.setType(String.class);
         options.addOption(vcfIclrInput);
 
-        Option mainInput = new Option("vi", ARG_MAIN_INPUT, true, "Main technology to compare with others [b|a|s|vl|vs|vm|vi]. (e.g. b - Bionano, vl - VCF Longranger, etc...)");
-        mainInput.setArgName("main technology");
+        Option mainInput = new Option("mi", ARG_MAIN_INPUT, true, getArgumentMainInputDescription());
+        mainInput.setArgName("main input source");
         mainInput.setType(String.class);
         options.addOption(mainInput);
 
@@ -208,15 +208,15 @@ public class BionanoHtsSvComparator {
         minimalProportion.setRequired(false);
         options.addOption(minimalProportion);
 
-        Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - number of bases delimited by semicolon (e.g. 10000;50000;100000)");
+        Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - bases counts delimited by semicolon (e.g. 10000;50000;100000)");
         distanceVarianceStats.setType(Integer.class);
-        distanceVarianceStats.setArgName("number of bases");
+        distanceVarianceStats.setArgName("bases counts");
         distanceVarianceStats.setRequired(false);
         options.addOption(distanceVarianceStats);
 
-        Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - threshold delimited by semicolon (e.g. 0.1;0.3;0.5)");
+        Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - thresholds delimited by semicolon (e.g. 0.1;0.3;0.5)");
         intersectionVarianceStats.setType(Integer.class);
-        intersectionVarianceStats.setArgName("threshold");
+        intersectionVarianceStats.setArgName("thresholds");
         intersectionVarianceStats.setRequired(false);
         options.addOption(intersectionVarianceStats);
 
@@ -262,11 +262,24 @@ public class BionanoHtsSvComparator {
         return cmd;
     }
 
-    private List<SvResultParser> getOtherParsers(CommandLine cmd) throws Exception {
+    private String getArgumentMainInputDescription() {
+        String description = String.format("Main input source to compare with others [%s]. (e.g. b - Bionano, vl - VCF Longranger, etc...)",
+            StringUtils.join(Arrays.stream(ParserType.values()).map(parserType -> parserType.value).collect(Collectors.toList()), "|"));
+
+        return description;
+    }
+
+    private void initParsers(CommandLine cmd) throws Exception {
         boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
         boolean vcfFilterPass = cmd.hasOption(ARG_VCF_FILTER_PASS);
+        ParserType mainParserType = cmd.hasOption(ARG_MAIN_INPUT) ? ParserType.of(cmd.getOptionValue(ARG_MAIN_INPUT)) : ParserType.BIONANO;
 
-        List<SvResultParser> otherParsers = new ArrayList<>();
+        if (cmd.hasOption(ARG_BIONANO_INPUT)) {
+            SvResultParser bionanoParser = new BionanoPipelineResultParser("bionano");
+            bionanoParser.setRemoveDuplicateVariants(true);
+            bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
+            addParser(bionanoParser, ParserType.BIONANO, mainParserType);
+        }
 
         if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_ANNOTSV_INPUT).split(";");
@@ -275,7 +288,7 @@ public class BionanoHtsSvComparator {
                 SvResultParser annotsvParser = new AnnotSvTsvParser("annotsv_" + getParserNameSuffix(input), preferBaseSvType);
                 annotsvParser.setRemoveDuplicateVariants(true);
                 annotsvParser.parseResultFile(input, "\t");
-                otherParsers.add(annotsvParser);
+                addParser(annotsvParser, ParserType.ANNOT_SV, mainParserType);
             }
         }
 
@@ -286,41 +299,46 @@ public class BionanoHtsSvComparator {
                 SvResultParser samplotParser = new SamplotCsvParser("samplot_" + getParserNameSuffix(input));
                 samplotParser.setRemoveDuplicateVariants(true);
                 samplotParser.parseResultFile(input, "\t");
-                otherParsers.add(samplotParser);
+                addParser(samplotParser, ParserType.SAMPLOT, mainParserType);
             }
         }
 
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT).split(";");
-            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, otherParsers);
+            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_LONGRANGER, mainParserType);
         }
 
         if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT).split(";");
-            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, otherParsers);
+            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_SNIFFLES, mainParserType);
         }
 
         if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_MANTA_INPUT).split(";");
-            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, otherParsers);
+            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_MANTA, mainParserType);
         }
 
         if (cmd.hasOption(ARG_VCF_ICLR_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_ICLR_INPUT).split(";");
-            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, otherParsers);
+            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_ICLR, mainParserType);
         }
-
-        return otherParsers;
     }
 
-    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, List<SvResultParser> otherParsers) throws Exception {
+    private void addParser(SvResultParser parser, ParserType type, ParserType mainType) {
+        if (type == mainType)
+            mainParser = parser;
+        else
+            otherParsers.add(parser);
+    }
+
+    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, ParserType parserType, ParserType mainParserType) throws Exception {
         for (String input : inputs) {
             GenericSvVcfParser vcfParser = new GenericSvVcfParser(namePrefix + getParserNameSuffix(input));
             vcfParser.setOnlyFilterPass(vcfFilterPass);
             vcfParser.setPreferBaseSvType(preferBaseSvType);
             vcfParser.setRemoveDuplicateVariants(true);
             vcfParser.parseResultFile(input, "\t");
-            otherParsers.add(vcfParser);
+            addParser(vcfParser, parserType, mainParserType);
         }
 
     }
@@ -329,8 +347,8 @@ public class BionanoHtsSvComparator {
         return FilenameUtils.removeExtension(new File(name).getName());
     }
 
-    private void printStructuralVariants(SvResultParser bionanoParser, List<SvResultParser> otherParsers) {
-        bionanoParser.printStructuralVariantStats();
+    private void printStructuralVariants(SvResultParser mainParser, List<SvResultParser> otherParsers) {
+        mainParser.printStructuralVariantStats();
 
         for (SvResultParser otherParser : otherParsers)
             otherParser.printStructuralVariantStats();
