@@ -95,14 +95,14 @@ public class BionanoHtsSvComparator {
         String[] distanceVarianceStatsCounts = cmd.hasOption(ARG_DISTANCE_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS).split(";") : null;
         String[] intersectionVarianceStatsThreshold = cmd.hasOption(ARG_INTERSECTION_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_INTERSECTION_VARIANCE_STATISTICS).split(";") : null;
 
-        boolean calculateDistanceVarianceStats = statsOutput != null &&
+        boolean calculateStats = statsOutput != null &&
                 ((distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0) ||
                  (intersectionVarianceStatsThreshold != null && intersectionVarianceStatsThreshold.length > 0));
 
         initParsers(cmd);
 
         if (mainParser == null || otherParsers.size() == 0) {
-            System.out.println("At least two input source (main, other) must be present. Exiting...");
+            System.out.println("At least two input source (main, other) have to be present for comparison. Exiting...");
             System.exit(1);
         }
 
@@ -114,7 +114,7 @@ public class BionanoHtsSvComparator {
         svComparator.setMinimalProportion(minimalProportion);
         svComparator.setExcludedRegions(getExcludedRegions(cmd.getOptionValue(ARG_REGION_FILTER_FILE)));
 
-        if (calculateDistanceVarianceStats) {
+        if (calculateStats) {
             svComparator.setCalculateStructuralVariantStats(true);
 
             if (distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0)
@@ -128,7 +128,7 @@ public class BionanoHtsSvComparator {
 
         printStructuralVariants(mainParser, otherParsers);
 
-        if (calculateDistanceVarianceStats)
+        if (calculateStats)
             svComparator.saveStructuralVariantStats(statsOutput);
     }
 
