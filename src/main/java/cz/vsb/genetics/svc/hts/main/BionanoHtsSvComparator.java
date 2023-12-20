@@ -43,7 +43,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class BionanoHtsSvComparator {
     private static final Logger log = LoggerFactory.getLogger(BionanoHtsSvComparator.class);
@@ -100,11 +99,6 @@ public class BionanoHtsSvComparator {
                  (intersectionVarianceStatsThreshold != null && intersectionVarianceStatsThreshold.length > 0));
 
         initParsers(cmd);
-
-        if (mainParser == null || otherParsers.size() == 0) {
-            System.out.println("At least two input source (main, other) have to be present for comparison. Exiting...");
-            System.exit(1);
-        }
 
         MultipleSvComparator svComparator = new MultipleSvComparator();
         svComparator.setOnlyCommonGenes(onlyCommonGeneVariants);
@@ -171,8 +165,8 @@ public class BionanoHtsSvComparator {
         vcfIclrInput.setType(String.class);
         options.addOption(vcfIclrInput);
 
-        Option mainInput = new Option("mi", ARG_MAIN_INPUT, true, getArgumentMainInputDescription());
-        mainInput.setArgName("main input source");
+        Option mainInput = new Option("mi", ARG_MAIN_INPUT, true, "Main variant file path used to determine main technology and input between other inputs.");
+        mainInput.setArgName("file path");
         mainInput.setType(String.class);
         options.addOption(mainInput);
 
@@ -262,23 +256,22 @@ public class BionanoHtsSvComparator {
         return cmd;
     }
 
-    private String getArgumentMainInputDescription() {
-        String description = String.format("Main input source to compare with others [%s]. (e.g. b - Bionano, vl - VCF Longranger, etc...)",
-            StringUtils.join(Arrays.stream(ParserType.values()).map(parserType -> parserType.value).collect(Collectors.toList()), "|"));
-
-        return description;
-    }
-
     private void initParsers(CommandLine cmd) throws Exception {
         boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
         boolean vcfFilterPass = cmd.hasOption(ARG_VCF_FILTER_PASS);
-        ParserType mainParserType = cmd.hasOption(ARG_MAIN_INPUT) ? ParserType.of(cmd.getOptionValue(ARG_MAIN_INPUT)) : ParserType.BIONANO;
+        String mainInput = cmd.hasOption(ARG_MAIN_INPUT) ? cmd.getOptionValue(ARG_MAIN_INPUT) : cmd.getOptionValue(ARG_BIONANO_INPUT);
+
+        if (StringUtils.isBlank(mainInput) && !cmd.hasOption(ARG_BIONANO_INPUT)) {
+            System.out.println("Cannon determine main input source. Either -mi parameter or Bionano smap input must be specified.");
+            System.exit(1);
+        }
 
         if (cmd.hasOption(ARG_BIONANO_INPUT)) {
+            String input = cmd.getOptionValue(ARG_BIONANO_INPUT);
             SvResultParser bionanoParser = new BionanoPipelineResultParser("bionano");
             bionanoParser.setRemoveDuplicateVariants(true);
-            bionanoParser.parseResultFile(cmd.getOptionValue(ARG_BIONANO_INPUT), "[,\t]");
-            addParser(bionanoParser, ParserType.BIONANO, mainParserType);
+            bionanoParser.parseResultFile(input, "[,\t]");
+            addParser(bionanoParser, input.equals(mainInput));
         }
 
         if (cmd.hasOption(ARG_ANNOTSV_INPUT)) {
@@ -288,7 +281,7 @@ public class BionanoHtsSvComparator {
                 SvResultParser annotsvParser = new AnnotSvTsvParser("annotsv_" + getParserNameSuffix(input), preferBaseSvType);
                 annotsvParser.setRemoveDuplicateVariants(true);
                 annotsvParser.parseResultFile(input, "\t");
-                addParser(annotsvParser, ParserType.ANNOT_SV, mainParserType);
+                addParser(annotsvParser, input.equals(mainInput));
             }
         }
 
@@ -299,46 +292,46 @@ public class BionanoHtsSvComparator {
                 SvResultParser samplotParser = new SamplotCsvParser("samplot_" + getParserNameSuffix(input));
                 samplotParser.setRemoveDuplicateVariants(true);
                 samplotParser.parseResultFile(input, "\t");
-                addParser(samplotParser, ParserType.SAMPLOT, mainParserType);
+                addParser(samplotParser, input.equals(mainInput));
             }
         }
 
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT).split(";");
-            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_LONGRANGER, mainParserType);
+            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
 
         if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT).split(";");
-            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_SNIFFLES, mainParserType);
+            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
 
         if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_MANTA_INPUT).split(";");
-            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_MANTA, mainParserType);
+            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
 
         if (cmd.hasOption(ARG_VCF_ICLR_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_ICLR_INPUT).split(";");
-            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, ParserType.VCF_ICLR, mainParserType);
+            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
     }
 
-    private void addParser(SvResultParser parser, ParserType type, ParserType mainType) {
-        if (type == mainType)
+    private void addParser(SvResultParser parser, boolean main) {
+        if (main)
             mainParser = parser;
         else
             otherParsers.add(parser);
     }
 
-    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, ParserType parserType, ParserType mainParserType) throws Exception {
+    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, String mainInput) throws Exception {
         for (String input : inputs) {
             GenericSvVcfParser vcfParser = new GenericSvVcfParser(namePrefix + getParserNameSuffix(input));
             vcfParser.setOnlyFilterPass(vcfFilterPass);
             vcfParser.setPreferBaseSvType(preferBaseSvType);
             vcfParser.setRemoveDuplicateVariants(true);
             vcfParser.parseResultFile(input, "\t");
-            addParser(vcfParser, parserType, mainParserType);
+            addParser(vcfParser, input.equals(mainInput));
         }
 
     }
