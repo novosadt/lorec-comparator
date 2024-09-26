@@ -54,6 +54,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_VCF_SNIFFLES_INPUT = "vcf_sniffles_input";
     private static final String ARG_VCF_MANTA_INPUT = "vcf_manta_input";
     private static final String ARG_VCF_ICLR_INPUT = "vcf_iclr_input";
+    private static final String ARG_VCF_CLINVAR_INPUT = "vcf_clinvar_input";
     private static final String ARG_MAIN_INPUT = "main_input";
     private static final String ARG_VCF_FILTER_PASS = "vcf_filter_pass";
     private static final String ARG_VARIANT_TYPE = "variant_type";
@@ -164,6 +165,11 @@ public class BionanoHtsSvComparator {
         vcfIclrInput.setArgName("vcf file");
         vcfIclrInput.setType(String.class);
         options.addOption(vcfIclrInput);
+
+        Option vcfClinvarInput = new Option("vc", ARG_VCF_CLINVAR_INPUT, true, "Clinvar vcf variants file paths delimited by semicolon");
+        vcfClinvarInput.setArgName("vcf file");
+        vcfClinvarInput.setType(String.class);
+        options.addOption(vcfClinvarInput);
 
         Option mainInput = new Option("mi", ARG_MAIN_INPUT, true, "Main variant file path used to determine main technology and input between other inputs.");
         mainInput.setArgName("file path");
@@ -315,6 +321,12 @@ public class BionanoHtsSvComparator {
             String[] inputs = cmd.getOptionValue(ARG_VCF_ICLR_INPUT).split(";");
             addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
+
+        if (cmd.hasOption(ARG_VCF_CLINVAR_INPUT)) {
+            String[] inputs = cmd.getOptionValue(ARG_VCF_CLINVAR_INPUT).split(";");
+            String[] infoTags = {"CLNSIG"};
+            addVcfOtherParser("vcf-clinvar_", inputs, false, preferBaseSvType, mainInput, infoTags);
+        }
     }
 
     private void addParser(SvResultParser parser, boolean main) {
@@ -325,12 +337,17 @@ public class BionanoHtsSvComparator {
     }
 
     private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, String mainInput) throws Exception {
+        addVcfOtherParser(namePrefix, inputs, vcfFilterPass, preferBaseSvType, mainInput, null);
+    }
+
+    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, String mainInput, String[] infoTags) throws Exception {
         for (String input : inputs) {
             GenericSvVcfParser vcfParser = new GenericSvVcfParser(namePrefix + getParserNameSuffix(input));
             vcfParser.setOnlyFilterPass(vcfFilterPass);
             vcfParser.setPreferBaseSvType(preferBaseSvType);
             vcfParser.setRemoveDuplicateVariants(true);
             vcfParser.parseResultFile(input, "\t");
+            vcfParser.setInfoTags(infoTags);
             addParser(vcfParser, input.equals(mainInput));
         }
 
