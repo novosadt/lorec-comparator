@@ -55,6 +55,8 @@ public class BionanoHtsSvComparator {
     private static final String ARG_VCF_MANTA_INPUT = "vcf_manta_input";
     private static final String ARG_VCF_ICLR_INPUT = "vcf_iclr_input";
     private static final String ARG_VCF_CLINVAR_INPUT = "vcf_clinvar_input";
+    private static final String ARG_VCF_DBVAR_INPUT = "vcf_dbvar_input";
+
     private static final String ARG_MAIN_INPUT = "main_input";
     private static final String ARG_VCF_FILTER_PASS = "vcf_filter_pass";
     private static final String ARG_VARIANT_TYPE = "variant_type";
@@ -170,6 +172,11 @@ public class BionanoHtsSvComparator {
         vcfClinvarInput.setArgName("vcf file");
         vcfClinvarInput.setType(String.class);
         options.addOption(vcfClinvarInput);
+
+        Option vcfDbvarInput = new Option("vd", ARG_VCF_DBVAR_INPUT, true, "dbVar vcf variants file paths delimited by semicolon");
+        vcfDbvarInput.setArgName("vcf file");
+        vcfDbvarInput.setType(String.class);
+        options.addOption(vcfDbvarInput);
 
         Option mainInput = new Option("mi", ARG_MAIN_INPUT, true, "Main variant file path used to determine main technology and input between other inputs.");
         mainInput.setArgName("file path");
@@ -326,6 +333,11 @@ public class BionanoHtsSvComparator {
             String[] inputs = cmd.getOptionValue(ARG_VCF_CLINVAR_INPUT).split(";");
             String[] infoTags = {"CLNSIG"};
             addVcfOtherParser("vcf-clinvar_", inputs, false, preferBaseSvType, mainInput, infoTags);
+        }
+
+        if (cmd.hasOption(ARG_VCF_DBVAR_INPUT)) {
+            String[] inputs = cmd.getOptionValue(ARG_VCF_DBVAR_INPUT).split(";");
+            addVcfOtherParser("vcf-dbvar_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
         }
     }
 
