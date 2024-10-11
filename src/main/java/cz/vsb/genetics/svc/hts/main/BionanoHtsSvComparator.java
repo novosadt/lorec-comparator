@@ -80,8 +80,7 @@ public class BionanoHtsSvComparator {
             comparator.compareVariants(args);
         }
         catch (Exception e) {
-            System.err.println("Error occurred: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error occurred: " + e.getMessage(), e);
         }
     }
 
@@ -383,7 +382,7 @@ public class BionanoHtsSvComparator {
             properties.load(BionanoHtsSvComparator.class.getClassLoader().getResourceAsStream("project.properties"));
         }
         catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error occured: " + e.getMessage(), e);
         }
 
         return properties.getProperty("version");
