@@ -33,6 +33,7 @@ import cz.vsb.genetics.om.sv.BionanoPipelineResultParser;
 import cz.vsb.genetics.sv.MultipleSvComparator;
 import cz.vsb.genetics.sv.StructuralVariantType;
 import cz.vsb.genetics.sv.SvResultParser;
+import cz.vsb.genetics.util.GeneAnnotator;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -64,6 +65,7 @@ public class BionanoHtsSvComparator {
     private static final String ARG_INTERSECTION_VARIANCE = "intersection_variance";
     private static final String ARG_MINIMAL_PROPORTION = "minimal_proportion";
     private static final String ARG_GENE_INTERSECTION = "gene_intersection";
+    private static final String ARG_GENE_FILE = "gene_file";
     private static final String ARG_PREFER_BASE_SVTYPE = "prefer_base_svtype";
     private static final String ARG_STATISTICS_OUTPUT = "statistics_output";
     private static final String ARG_DISTANCE_VARIANCE_STATISTICS = "distance_variance_statistics";
@@ -188,6 +190,11 @@ public class BionanoHtsSvComparator {
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
         options.addOption(geneIntersection);
 
+        Option geneFile = new Option("gf", ARG_GENE_FILE, true, "file containing gene information list - (i.e. gene symbol, chromosome, start, end");
+        geneFile.setArgName("gene file");
+        geneFile.setType(String.class);
+        options.addOption(geneFile);
+
         Option svType = new Option("svt", ARG_PREFER_BASE_SVTYPE, false, "whether to prefer base variant type (SVTYPE) in case of BND and 10x/TELL-Seq (default false i.e. SVTYPE2)");
         options.addOption(svType);
 
@@ -274,7 +281,7 @@ public class BionanoHtsSvComparator {
         String mainInput = cmd.hasOption(ARG_MAIN_INPUT) ? cmd.getOptionValue(ARG_MAIN_INPUT) : cmd.getOptionValue(ARG_BIONANO_INPUT);
 
         if (StringUtils.isBlank(mainInput) && !cmd.hasOption(ARG_BIONANO_INPUT)) {
-            System.out.println("Cannon determine main input source. Either -mi parameter or Bionano smap input must be specified.");
+            System.out.println("Cannot determine main input source. Either -mi parameter or Bionano smap input must be specified.");
             System.exit(1);
         }
 
@@ -308,35 +315,41 @@ public class BionanoHtsSvComparator {
             }
         }
 
+        GeneAnnotator geneAnnotator = null;
+        if (cmd.hasOption(ARG_GENE_FILE)) {
+            geneAnnotator = new GeneAnnotator();
+            geneAnnotator.parseGeneFile(cmd.getOptionValue(ARG_GENE_FILE), ";", true);
+        }
+
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_LONGRANGER_INPUT).split(";");
-            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
+            addVcfOtherParser("vcf-longranger_", inputs, vcfFilterPass, preferBaseSvType, mainInput, geneAnnotator);
         }
 
         if (cmd.hasOption(ARG_VCF_SNIFFLES_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_SNIFFLES_INPUT).split(";");
-            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
+            addVcfOtherParser("vcf-sniffles_", inputs, vcfFilterPass, preferBaseSvType, mainInput, geneAnnotator);
         }
 
         if (cmd.hasOption(ARG_VCF_MANTA_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_MANTA_INPUT).split(";");
-            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
+            addVcfOtherParser("vcf-manta_", inputs, vcfFilterPass, preferBaseSvType, mainInput, geneAnnotator);
         }
 
         if (cmd.hasOption(ARG_VCF_ICLR_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_ICLR_INPUT).split(";");
-            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
+            addVcfOtherParser("vcf-iclr_", inputs, vcfFilterPass, preferBaseSvType, mainInput, geneAnnotator);
         }
 
         if (cmd.hasOption(ARG_VCF_CLINVAR_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_CLINVAR_INPUT).split(";");
             String[] infoTags = {"CLNSIG"};
-            addVcfOtherParser("vcf-clinvar_", inputs, false, preferBaseSvType, mainInput, infoTags);
+            addVcfOtherParser("vcf-clinvar_", inputs, false, preferBaseSvType, mainInput, infoTags, geneAnnotator);
         }
 
         if (cmd.hasOption(ARG_VCF_DBVAR_INPUT)) {
             String[] inputs = cmd.getOptionValue(ARG_VCF_DBVAR_INPUT).split(";");
-            addVcfOtherParser("vcf-dbvar_", inputs, vcfFilterPass, preferBaseSvType, mainInput);
+            addVcfOtherParser("vcf-dbvar_", inputs, vcfFilterPass, preferBaseSvType, mainInput, geneAnnotator);
         }
     }
 
@@ -347,18 +360,22 @@ public class BionanoHtsSvComparator {
             otherParsers.add(parser);
     }
 
-    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, String mainInput) throws Exception {
-        addVcfOtherParser(namePrefix, inputs, vcfFilterPass, preferBaseSvType, mainInput, null);
+    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType,
+                                   String mainInput, GeneAnnotator geneAnnotator) throws Exception {
+        addVcfOtherParser(namePrefix, inputs, vcfFilterPass, preferBaseSvType, mainInput, null, geneAnnotator);
     }
 
-    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType, String mainInput, String[] infoTags) throws Exception {
+    private void addVcfOtherParser(String namePrefix, String[] inputs, boolean vcfFilterPass, boolean preferBaseSvType,
+                                   String mainInput, String[] infoTags, GeneAnnotator geneAnnotator) throws Exception {
         for (String input : inputs) {
             GenericSvVcfParser vcfParser = new GenericSvVcfParser(namePrefix + getParserNameSuffix(input));
             vcfParser.setOnlyFilterPass(vcfFilterPass);
             vcfParser.setPreferBaseSvType(preferBaseSvType);
             vcfParser.setRemoveDuplicateVariants(true);
-            vcfParser.parseResultFile(input, "\t");
             vcfParser.setInfoTags(infoTags);
+            vcfParser.setGeneAnnotator(geneAnnotator);
+            vcfParser.parseResultFile(input, "\t");
+
             addParser(vcfParser, input.equals(mainInput));
         }
 
