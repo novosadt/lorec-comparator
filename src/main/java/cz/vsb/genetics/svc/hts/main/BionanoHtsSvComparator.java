@@ -134,7 +134,6 @@ public class BionanoHtsSvComparator {
         Options options = new Options();
 
         Option bionanoInput = new Option("b", ARG_BIONANO_INPUT, true, "bionano pipeline result file path (smap)");
-        bionanoInput.setRequired(true);
         bionanoInput.setArgName("smap file");
         bionanoInput.setType(String.class);
         options.addOption(bionanoInput);
