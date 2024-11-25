@@ -75,6 +75,7 @@ public class BionanoHtsSvComparator {
 
     private SvResultParser mainParser;
     private final List<SvResultParser> otherParsers = new ArrayList<>();
+    private GeneAnnotator geneAnnotator;
 
     public static void main(String[] args) {
         try {
@@ -97,6 +98,7 @@ public class BionanoHtsSvComparator {
         String statsOutput = cmd.getOptionValue(ARG_STATISTICS_OUTPUT);
         String[] distanceVarianceStatsCounts = cmd.hasOption(ARG_DISTANCE_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_DISTANCE_VARIANCE_STATISTICS).split(";") : null;
         String[] intersectionVarianceStatsThreshold = cmd.hasOption(ARG_INTERSECTION_VARIANCE_STATISTICS) ? cmd.getOptionValue(ARG_INTERSECTION_VARIANCE_STATISTICS).split(";") : null;
+        geneAnnotator = getGeneAnnotator(cmd);
 
         boolean calculateStats = statsOutput != null &&
                 ((distanceVarianceStatsCounts != null && distanceVarianceStatsCounts.length > 0) ||
@@ -111,6 +113,7 @@ public class BionanoHtsSvComparator {
         svComparator.setVariantTypes(variantType);
         svComparator.setMinimalProportion(minimalProportion);
         svComparator.setExcludedRegions(getExcludedRegions(cmd.getOptionValue(ARG_REGION_FILTER_FILE)));
+        svComparator.setGeneAnnotator(geneAnnotator);
 
         if (calculateStats) {
             svComparator.setCalculateStructuralVariantStats(true);
@@ -274,6 +277,16 @@ public class BionanoHtsSvComparator {
         return cmd;
     }
 
+    private GeneAnnotator getGeneAnnotator(CommandLine cmd) throws Exception {
+        GeneAnnotator geneAnnotator = null;
+        if (cmd.hasOption(ARG_GENE_FILE)) {
+            geneAnnotator = new GeneAnnotator();
+            geneAnnotator.parseGeneFile(cmd.getOptionValue(ARG_GENE_FILE), ";");
+        }
+
+        return geneAnnotator;
+    }
+
     private void initParsers(CommandLine cmd) throws Exception {
         boolean preferBaseSvType = cmd.hasOption(ARG_PREFER_BASE_SVTYPE);
         boolean vcfFilterPass = cmd.hasOption(ARG_VCF_FILTER_PASS);
@@ -312,12 +325,6 @@ public class BionanoHtsSvComparator {
                 samplotParser.parseResultFile(input, "\t");
                 addParser(samplotParser, input.equals(mainInput));
             }
-        }
-
-        GeneAnnotator geneAnnotator = null;
-        if (cmd.hasOption(ARG_GENE_FILE)) {
-            geneAnnotator = new GeneAnnotator();
-            geneAnnotator.parseGeneFile(cmd.getOptionValue(ARG_GENE_FILE), ";", true);
         }
 
         if (cmd.hasOption(ARG_VCF_LONGRANGER_INPUT)) {
