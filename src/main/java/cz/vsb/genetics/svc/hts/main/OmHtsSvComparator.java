@@ -45,8 +45,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.*;
 
-public class BionanoHtsSvComparator {
-    private static final Logger log = LoggerFactory.getLogger(BionanoHtsSvComparator.class);
+public class OmHtsSvComparator {
+    private static final Logger log = LoggerFactory.getLogger(OmHtsSvComparator.class);
 
     private static final String ARG_BIONANO_INPUT = "bionano_input";
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
@@ -79,7 +79,7 @@ public class BionanoHtsSvComparator {
 
     public static void main(String[] args) {
         try {
-            BionanoHtsSvComparator comparator = new BionanoHtsSvComparator();
+            OmHtsSvComparator comparator = new OmHtsSvComparator();
             comparator.compareVariants(args);
         }
         catch (Exception e) {
@@ -192,27 +192,17 @@ public class BionanoHtsSvComparator {
         Option geneIntersection = new Option("g", ARG_GENE_INTERSECTION, false, "select only variants with common genes (default false)");
         options.addOption(geneIntersection);
 
-        Option geneFile = new Option("gf", ARG_GENE_FILE, true, "file containing gene information list - (i.e. gene symbol, chromosome, start, end");
-        geneFile.setArgName("gene file");
-        geneFile.setType(String.class);
-        options.addOption(geneFile);
-
-        Option svType = new Option("svt", ARG_PREFER_BASE_SVTYPE, false, "whether to prefer base variant type (SVTYPE) in case of BND and 10x/TELL-Seq (default false i.e. SVTYPE2)");
+        Option svType = new Option("svt", ARG_PREFER_BASE_SVTYPE, false, "whether to prefer base variant type (SVTYPE) in case of BND and 10x/TELL-Seq (default off i.e. preferring SVTYPE2)");
         options.addOption(svType);
 
-        Option variantType = new Option("t", ARG_VARIANT_TYPE, true, "variant type filter, any combination of [BND,CNV,DEL,INS,DUP,INV,UNK], delimited by semicolon");
-        variantType.setType(String.class);
-        variantType.setArgName("sv types");
-        options.addOption(variantType);
-
-        Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between variant from NGS and OM");
+        Option distanceVariance = new Option("d", ARG_DISTANCE_VARIANCE, true, "distance variance filter - number of bases difference between compared variants");
         distanceVariance.setType(Integer.class);
         distanceVariance.setArgName("number of bases");
         distanceVariance.setRequired(false);
         options.addOption(distanceVariance);
 
-        Option intersectionVariance = new Option("i", ARG_INTERSECTION_VARIANCE, true, "intersection variance filter - threshold difference between variant from NGS and OM");
-        intersectionVariance.setType(Integer.class);
+        Option intersectionVariance = new Option("i", ARG_INTERSECTION_VARIANCE, true, "intersection variance filter - threshold difference between compared variants");
+        intersectionVariance.setType(Double.class);
         intersectionVariance.setArgName("threshold");
         intersectionVariance.setRequired(false);
         options.addOption(intersectionVariance);
@@ -223,27 +213,37 @@ public class BionanoHtsSvComparator {
         minimalProportion.setRequired(false);
         options.addOption(minimalProportion);
 
-        Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - bases counts delimited by semicolon (e.g. 10000;50000;100000)");
-        distanceVarianceStats.setType(Integer.class);
-        distanceVarianceStats.setArgName("bases counts");
-        distanceVarianceStats.setRequired(false);
-        options.addOption(distanceVarianceStats);
-
-        Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - thresholds delimited by semicolon (e.g. 0.1;0.3;0.5)");
-        intersectionVarianceStats.setType(Integer.class);
-        intersectionVarianceStats.setArgName("thresholds");
-        intersectionVarianceStats.setRequired(false);
-        options.addOption(intersectionVarianceStats);
-
-        Option statsOutput = new Option("so", ARG_STATISTICS_OUTPUT, true, "output structural variants statistics file");
-        statsOutput.setArgName("csv file");
-        statsOutput.setType(String.class);
-        options.addOption(statsOutput);
+        Option variantType = new Option("t", ARG_VARIANT_TYPE, true, "variant type filter, any combination of [BND,CNV,DEL,INS,DUP,INV,UNK], delimited by semicolon, only variant types listed will processed");
+        variantType.setType(String.class);
+        variantType.setArgName("sv types");
+        options.addOption(variantType);
 
         Option regionFilterFile = new Option("rff", ARG_REGION_FILTER_FILE, true, "List of regions to be excluded from analysis (bed format, tab separated)");
         regionFilterFile.setArgName("bed file");
         regionFilterFile.setType(String.class);
         options.addOption(regionFilterFile);
+
+        Option geneFile = new Option("gf", ARG_GENE_FILE, true, "file containing gene information list - (i.e. gene symbol, chromosome, start, end) - gene annotation.");
+        geneFile.setArgName("gene file");
+        geneFile.setType(String.class);
+        options.addOption(geneFile);
+
+        Option distanceVarianceStats = new Option("dvs", ARG_DISTANCE_VARIANCE_STATISTICS, true, "distance variance statistics - bases counts delimited by semicolon (e.g. 10000;50000;100000). Number of variants having distance variance at least 1000, 50000 bases, etc.");
+        distanceVarianceStats.setType(Integer.class);
+        distanceVarianceStats.setArgName("bases counts");
+        distanceVarianceStats.setRequired(false);
+        options.addOption(distanceVarianceStats);
+
+        Option intersectionVarianceStats = new Option("ivs", ARG_INTERSECTION_VARIANCE_STATISTICS, true, "intersection variance statistics - thresholds delimited by semicolon (e.g. 0.1;0.3;0.5). Number of variants having intersection variance score at least 0.1, 0.3, etc.\"");
+        intersectionVarianceStats.setType(Integer.class);
+        intersectionVarianceStats.setArgName("thresholds");
+        intersectionVarianceStats.setRequired(false);
+        options.addOption(intersectionVarianceStats);
+
+        Option statsOutput = new Option("so", ARG_STATISTICS_OUTPUT, true, "output structural variants statistics csv file");
+        statsOutput.setArgName("csv file");
+        statsOutput.setType(String.class);
+        options.addOption(statsOutput);
 
         Option output = new Option("o", ARG_OUTPUT, true, "output result file");
         output.setRequired(true);
@@ -258,15 +258,15 @@ public class BionanoHtsSvComparator {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            System.out.println("\nSVC - Bionano Genomics (OM) and High Throughput Sequencing (HTS) Structural Variant Comparator, v" + BionanoHtsSvComparator.version() + "\n");
+            System.out.println("\nSVC - Whole genome sequencing (Optical mapping and/or High-throughput) Structural Variant Comparator, v" + OmHtsSvComparator.version() + "\n");
             System.out.println(e.getMessage());
             System.out.println();
             formatter.printHelp(
                     300,
-                    "\njava -jar om-samplot-svc.jar ",
+                    "\njava -jar om-hts-svc.jar ",
                     "\noptions:",
                     options,
-                    "\nTomas Novosad, VSB-TU Ostrava, 2023" +
+                    "\nTomas Novosad, VSB-TU Ostrava, 2025" +
                             "\nFEI, Department of Computer Science" +
                             "\nVersion: " + version() +
                             "\nLicense: GPL-3.0-only ");
@@ -402,7 +402,7 @@ public class BionanoHtsSvComparator {
         final Properties properties = new Properties();
 
         try {
-            properties.load(BionanoHtsSvComparator.class.getClassLoader().getResourceAsStream("project.properties"));
+            properties.load(OmHtsSvComparator.class.getClassLoader().getResourceAsStream("project.properties"));
         }
         catch (Exception e) {
             log.error("Error occured: " + e.getMessage(), e);
