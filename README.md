@@ -1,4 +1,4 @@
-# om-hts-svc: Whole Genome Sequencing Structural Variant Comparator - part of LoReC
+# om-hts-svc: Optical Mapping and Hight-Throughput Sequencing Structural Variant Comparator - part of LoReC
 
 A software tool for comparison of structural variants identified by various whole genome sequencing technologies such as 
 optical mapping technology (Bionano Genomics) and High-Throughput sequencing (HTS) technologies i.e. 10x Genomics, Oxford Nanopore Technologies and Pacific Biosciences. 
