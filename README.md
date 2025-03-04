@@ -49,28 +49,28 @@ Some basic example usage of structural variant comparator follows. More detailed
 In basic setup, application compares all SVs contained in input files. No filters are applied here.
 
 ```console
-java -jar om-hts-svc.jar -vl "longranger_01.vfc;longranger_02.vcf" -vm "manta_01.vcf;manta_02.vcf;manta_03.vcf" -a annotsv.tsv -b bionano.smap -mi manta_01.vcf -o result.csv
+java -jar lorec-comparator.jar -vl "longranger_01.vfc;longranger_02.vcf" -vm "manta_01.vcf;manta_02.vcf;manta_03.vcf" -a annotsv.tsv -b bionano.smap -mi manta_01.vcf -o result.csv
 ```
 
 ### Distance Variance filter
 Following command filters out variants which have distance variance greater than 50000 bases.
 
 ```consolev
-java -jar om-hts-svc.jar -vl longranger.vcf -b bionano.smap -d 50000 -o result.csv 
+java -jar lorec-comparator.jar -vl longranger.vcf -b bionano.smap -d 50000 -o result.csv 
 ```
 
 ### Overlapping genes filter
 Following command filters out variants which have distance variance greater than 50000 bases and have no genes in overlap.
 
 ```console
-java -jar om-hts-svc.jar -vl longranger.vcf -b bionano.smap -d 50000 -g -o result.csv 
+java -jar lorec-comparator.jar -vl longranger.vcf -b bionano.smap -d 50000 -g -o result.csv 
 ```
 
 ### Variant type filter
 Following command will analyze only translocations (BND), deletions (DEL) and insertions (INS). Other variant types are ignored.
 
 ```console
-java -jar om-hts-svc.jar -vl longranger.vcf -b bionano.smap -t "BND,DEL,INS" -o result.csv 
+java -jar lorec-comparator.jar -vl longranger.vcf -b bionano.smap -t "BND,DEL,INS" -o result.csv 
 ```
 
 ## Contact
