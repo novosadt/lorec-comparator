@@ -45,8 +45,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.*;
 
-public class OmHtsSvComparator {
-    private static final Logger log = LoggerFactory.getLogger(OmHtsSvComparator.class);
+public class LoReCComparator {
+    private static final Logger log = LoggerFactory.getLogger(LoReCComparator.class);
 
     private static final String ARG_BIONANO_INPUT = "bionano_input";
     private static final String ARG_ANNOTSV_INPUT = "annotsv_input";
@@ -79,7 +79,7 @@ public class OmHtsSvComparator {
 
     public static void main(String[] args) {
         try {
-            OmHtsSvComparator comparator = new OmHtsSvComparator();
+            LoReCComparator comparator = new LoReCComparator();
             comparator.compareVariants(args);
         }
         catch (Exception e) {
@@ -258,12 +258,12 @@ public class OmHtsSvComparator {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            System.out.println("\nSVC - Whole genome sequencing (Optical mapping and/or High-throughput) Structural Variant Comparator, v" + OmHtsSvComparator.version() + "\n");
+            System.out.println("\nLoReC Comparator - Long Read Sequencing structural variant comparator, v" + LoReCComparator.version() + "\n");
             System.out.println(e.getMessage());
             System.out.println();
             formatter.printHelp(
                     300,
-                    "\njava -jar om-hts-svc.jar ",
+                    "\njava -jar lorec-comparator.jar ",
                     "\noptions:",
                     options,
                     "\nTomas Novosad, VSB-TU Ostrava, 2025" +
@@ -402,7 +402,7 @@ public class OmHtsSvComparator {
         final Properties properties = new Properties();
 
         try {
-            properties.load(OmHtsSvComparator.class.getClassLoader().getResourceAsStream("project.properties"));
+            properties.load(LoReCComparator.class.getClassLoader().getResourceAsStream("project.properties"));
         }
         catch (Exception e) {
             log.error("Error occured: " + e.getMessage(), e);
