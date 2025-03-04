@@ -6,7 +6,7 @@
 
     <groupId>cz.vsb.genetics</groupId>
     <artifactId>lorec-comparator</artifactId>
-    <description>Optical Mapping (OM) and High-Throughput Sequencing (HTS) Structural Variant Comparator</description>
+    <description>LoReC - Optical papping, high-throughput and long read sequencing structural variant Comparator</description>
     <version>1.1</version>
     <name>lorec-comparator</name>
 
